@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   addTodo,
   deleteTodo,
@@ -11,6 +11,10 @@ import {
   type TodoFilter,
   type Todo,
 } from './todos'
+import {
+  createLocalTodoPersistence,
+  createTodoSyncController,
+} from './todoSync'
 
 const filterOptions: { value: TodoFilter; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -19,9 +23,27 @@ const filterOptions: { value: TodoFilter; label: string }[] = [
 ]
 
 function App() {
-  const [todos, setTodos] = useState<Todo[]>(() => loadTodos())
+  const [syncController] = useState(() =>
+    createTodoSyncController({
+      initialTodos: loadTodos(),
+      persistTodos: createLocalTodoPersistence(),
+      saveLocalTodos: saveTodos,
+    }),
+  )
+  const [syncState, setSyncState] = useState(() =>
+    syncController.getSnapshot(),
+  )
   const [filter, setFilter] = useState<TodoFilter>(() => loadTodoFilter())
   const [title, setTitle] = useState('')
+  const todos = syncState.todos
+
+  useEffect(
+    () =>
+      syncController.subscribe(() => {
+        setSyncState(syncController.getSnapshot())
+      }),
+    [syncController],
+  )
 
   const remaining = useMemo(
     () => todos.filter((todo) => !todo.completed).length,
@@ -29,9 +51,8 @@ function App() {
   )
   const visibleTodos = useMemo(() => filterTodos(todos, filter), [todos, filter])
 
-  function commit(nextTodos: Todo[]) {
-    setTodos(nextTodos)
-    saveTodos(nextTodos)
+  function commit(nextTodos: Todo[], operationName: string) {
+    void syncController.commit(nextTodos, operationName)
   }
 
   function selectFilter(nextFilter: TodoFilter) {
@@ -45,8 +66,12 @@ function App() {
     if (next === todos) {
       return
     }
-    commit(next)
+    commit(next, `add ${next.at(-1)?.title ?? 'todo'}`)
     setTitle('')
+  }
+
+  function handleOnlineChange(nextOnline: boolean) {
+    void syncController.setOnline(nextOnline)
   }
 
   return (
@@ -58,6 +83,26 @@ function App() {
           {remaining} active of {todos.length} total
         </p>
       </header>
+
+      <section className="sync-panel" aria-label="Sync status">
+        <label className="online-toggle">
+          <input
+            type="checkbox"
+            aria-label="Online mode"
+            checked={syncState.online}
+            onChange={(event) => handleOnlineChange(event.target.checked)}
+          />
+          <span>{syncState.online ? 'Online' : 'Offline'}</span>
+        </label>
+        <p>Pending sync: {syncState.pendingCount}</p>
+        {syncState.syncing ? <p>Syncing changes...</p> : null}
+      </section>
+
+      {syncState.error ? (
+        <p className="sync-error" role="alert">
+          {syncState.error}
+        </p>
+      ) : null}
 
       <form className="todo-form" onSubmit={handleSubmit}>
         <label htmlFor="new-todo">New todo</label>
@@ -97,13 +142,17 @@ function App() {
                 <input
                   type="checkbox"
                   checked={todo.completed}
-                  onChange={() => commit(toggleTodo(todos, todo.id))}
+                  onChange={() =>
+                    commit(toggleTodo(todos, todo.id), `toggle ${todo.title}`)
+                  }
                 />
                 <span>{todo.title}</span>
               </label>
               <button
                 type="button"
-                onClick={() => commit(deleteTodo(todos, todo.id))}
+                onClick={() =>
+                  commit(deleteTodo(todos, todo.id), `delete ${todo.title}`)
+                }
               >
                 Delete
               </button>

@@ -70,6 +70,40 @@ h1 {
   color: #53627a;
 }
 
+.sync-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin: 22px 0 0;
+  padding: 12px;
+  border: 1px solid #d9e0ec;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #53627a;
+}
+
+.sync-panel p {
+  margin: 0;
+}
+
+.online-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #172033;
+  font-weight: 700;
+}
+
+.sync-error {
+  margin: 14px 0 0;
+  border: 1px solid #d65d5d;
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: #fff1f1;
+  color: #8f1f1f;
+}
+
 .todo-form {
   display: grid;
   gap: 8px;
