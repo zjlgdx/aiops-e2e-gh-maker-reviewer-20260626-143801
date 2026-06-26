@@ -79,3 +79,29 @@ test('queues an offline add and drains it after returning online', async ({
   await expect(page.getByText('Online')).toBeVisible()
   await expect(page.getByText('Pending sync: 0')).toBeVisible()
 })
+
+test('undoes an offline delete before draining the sync queue', async ({
+  page,
+}) => {
+  await page.goto('/')
+
+  await page.getByLabel('New todo').fill('Undo queued delete')
+  await page.getByRole('button', { name: 'Add' }).click()
+  await expect(page.getByText('Undo queued delete')).toBeVisible()
+
+  await page.getByLabel('Online mode').uncheck()
+  await expect(page.getByText('Offline')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Delete' }).click()
+  await expect(page.getByText('No todos yet.')).toBeVisible()
+  await expect(page.getByText('Pending sync: 1')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await expect(page.getByText('Undo queued delete')).toBeVisible()
+  await expect(page.getByText('Pending sync: 0')).toBeVisible()
+
+  await page.getByLabel('Online mode').check()
+  await expect(page.getByText('Online')).toBeVisible()
+  await expect(page.getByText('Pending sync: 0')).toBeVisible()
+  await expect(page.getByText('Undo queued delete')).toBeVisible()
+})

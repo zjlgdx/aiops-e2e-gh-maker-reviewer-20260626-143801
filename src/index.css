@@ -104,6 +104,24 @@ h1 {
   color: #8f1f1f;
 }
 
+.undo-delete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 14px 0 0;
+  border: 1px solid #b6c0d1;
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  color: #172033;
+}
+
+.undo-delete button {
+  padding: 7px 12px;
+}
+
 .todo-form {
   display: grid;
   gap: 8px;
