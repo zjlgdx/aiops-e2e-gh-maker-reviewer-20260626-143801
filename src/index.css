@@ -97,6 +97,26 @@ h1 {
   padding: 10px 16px;
 }
 
+.filter-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 20px;
+}
+
+.filter-tabs button {
+  min-width: 96px;
+  padding: 8px 12px;
+  background: #fff;
+  color: #172033;
+}
+
+.filter-tabs button[aria-pressed="true"] {
+  border-color: #172033;
+  background: #172033;
+  color: #fff;
+}
+
 .empty-state {
   border: 1px dashed #b6c0d1;
   border-radius: 6px;

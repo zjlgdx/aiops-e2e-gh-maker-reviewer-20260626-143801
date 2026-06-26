@@ -2,24 +2,41 @@ import { useMemo, useState, type FormEvent } from 'react'
 import {
   addTodo,
   deleteTodo,
+  filterTodos,
+  loadTodoFilter,
   loadTodos,
+  saveTodoFilter,
   saveTodos,
   toggleTodo,
+  type TodoFilter,
   type Todo,
 } from './todos'
 
+const filterOptions: { value: TodoFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'active', label: 'Active' },
+  { value: 'completed', label: 'Completed' },
+]
+
 function App() {
   const [todos, setTodos] = useState<Todo[]>(() => loadTodos())
+  const [filter, setFilter] = useState<TodoFilter>(() => loadTodoFilter())
   const [title, setTitle] = useState('')
 
   const remaining = useMemo(
     () => todos.filter((todo) => !todo.completed).length,
     [todos],
   )
+  const visibleTodos = useMemo(() => filterTodos(todos, filter), [todos, filter])
 
   function commit(nextTodos: Todo[]) {
     setTodos(nextTodos)
     saveTodos(nextTodos)
+  }
+
+  function selectFilter(nextFilter: TodoFilter) {
+    setFilter(nextFilter)
+    saveTodoFilter(nextFilter)
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -55,11 +72,26 @@ function App() {
         </div>
       </form>
 
+      <div className="filter-tabs" aria-label="Todo filters">
+        {filterOptions.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={filter === option.value}
+            onClick={() => selectFilter(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
       {todos.length === 0 ? (
         <p className="empty-state">No todos yet.</p>
+      ) : visibleTodos.length === 0 ? (
+        <p className="empty-state">No {filter} todos.</p>
       ) : (
         <ul className="todo-list" aria-label="Todo list">
-          {todos.map((todo) => (
+          {visibleTodos.map((todo) => (
             <li key={todo.id} className={todo.completed ? 'completed' : ''}>
               <label>
                 <input
