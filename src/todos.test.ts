@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   addTodo,
+  completeActiveTodos,
   deleteTodo,
   filterTodos,
   toggleTodo,
@@ -40,6 +41,23 @@ describe('todo core behavior', () => {
     expect(toggled[0]?.completed).toBe(true)
 
     expect(deleteTodo(toggled, '1')).toEqual([])
+  })
+
+  it('completes active todos without changing completed todos or mutating input', () => {
+    const completedTodo: Todo = {
+      id: '2',
+      title: 'Review the PR',
+      completed: true,
+      createdAt: '2026-06-26T00:01:00.000Z',
+    }
+    const todos = [baseTodo, completedTodo]
+
+    const completed = completeActiveTodos(todos)
+
+    expect(completed).toEqual([{ ...baseTodo, completed: true }, completedTodo])
+    expect(todos).toEqual([baseTodo, completedTodo])
+    const allCompleted = [completedTodo]
+    expect(completeActiveTodos(allCompleted)).toBe(allCompleted)
   })
 
   it('filters todos without mutating the source list', () => {

@@ -1,6 +1,6 @@
 import type { Todo } from './todos'
 
-type PersistTodoOperationType = 'save' | 'delete'
+type PersistTodoOperationType = 'save' | 'delete' | 'bulk-complete'
 
 export type CommitTodoOptions = {
   type?: PersistTodoOperationType

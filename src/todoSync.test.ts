@@ -17,6 +17,88 @@ const secondTodo: Todo = {
 }
 
 describe('todo sync controller', () => {
+  it('drains one offline bulk complete operation through the versioned queue path', async () => {
+    const completedTodos = [
+      { ...baseTodo, completed: true },
+      { ...secondTodo, completed: true },
+    ]
+    const operations: Array<{
+      name: string
+      type: string
+      todos: Todo[]
+      version: number
+    }> = []
+    const controller = createTodoSyncController({
+      initialTodos: [baseTodo, secondTodo],
+      persistTodos: async (_todos, operation) => {
+        operations.push({
+          name: operation.name,
+          type: operation.type,
+          todos: operation.todos,
+          version: operation.version,
+        })
+        return { todos: operation.todos, version: operation.version }
+      },
+      saveLocalTodos: () => undefined,
+    })
+
+    await controller.setOnline(false)
+    await controller.commit(completedTodos, 'complete all active', {
+      type: 'bulk-complete',
+    })
+
+    expect(controller.getSnapshot().todos).toEqual(completedTodos)
+    expect(controller.getSnapshot().pendingCount).toBe(1)
+
+    await controller.setOnline(true)
+
+    expect(operations).toEqual([
+      {
+        name: 'complete all active',
+        type: 'bulk-complete',
+        todos: completedTodos,
+        version: 1,
+      },
+    ])
+    expect(controller.getSnapshot().pendingCount).toBe(0)
+  })
+
+  it('ignores a stale bulk complete acknowledgement after newer state is saved', async () => {
+    const completedTodo = { ...baseTodo, completed: true }
+    const newerTodos = [completedTodo, secondTodo]
+    const pendingBulkComplete: { resolve?: () => void } = {}
+    const savedTodos: Todo[][] = []
+    const controller = createTodoSyncController({
+      initialTodos: [baseTodo],
+      persistTodos: (_todos, operation) =>
+        new Promise((resolve) => {
+          if (operation.type === 'bulk-complete') {
+            pendingBulkComplete.resolve = () =>
+              resolve({ todos: operation.todos, version: operation.version })
+            return
+          }
+          resolve({ todos: operation.todos, version: operation.version })
+        }),
+      saveLocalTodos: (todos) => {
+        savedTodos.push(todos)
+      },
+    })
+
+    await controller.setOnline(false)
+    await controller.commit([completedTodo], 'complete all active', {
+      type: 'bulk-complete',
+    })
+    const drain = controller.setOnline(true)
+
+    await controller.commit(newerTodos, 'add Review the PR')
+    pendingBulkComplete.resolve?.()
+    await drain
+
+    expect(savedTodos).toEqual([newerTodos])
+    expect(controller.getSnapshot().todos).toEqual(newerTodos)
+    expect(controller.getSnapshot().pendingCount).toBe(0)
+  })
+
   it('drains offline queued saves in operation order', async () => {
     const operationNames: string[] = []
     const controller = createTodoSyncController({

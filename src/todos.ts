@@ -65,6 +65,16 @@ export function toggleTodo(todos: Todo[], id: string): Todo[] {
   )
 }
 
+export function completeActiveTodos(todos: Todo[]): Todo[] {
+  if (todos.every((todo) => todo.completed)) {
+    return todos
+  }
+
+  return todos.map((todo) =>
+    todo.completed ? todo : { ...todo, completed: true },
+  )
+}
+
 export function deleteTodo(todos: Todo[], id: string): Todo[] {
   return todos.filter((todo) => todo.id !== id)
 }
