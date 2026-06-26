@@ -14,6 +14,7 @@ import {
 import {
   createLocalTodoPersistence,
   createTodoSyncController,
+  type CommitTodoOptions,
 } from './todoSync'
 
 const filterOptions: { value: TodoFilter; label: string }[] = [
@@ -21,6 +22,11 @@ const filterOptions: { value: TodoFilter; label: string }[] = [
   { value: 'active', label: 'Active' },
   { value: 'completed', label: 'Completed' },
 ]
+
+type DeletedTodo = {
+  todo: Todo
+  index: number
+}
 
 function App() {
   const [syncController] = useState(() =>
@@ -35,6 +41,7 @@ function App() {
   )
   const [filter, setFilter] = useState<TodoFilter>(() => loadTodoFilter())
   const [title, setTitle] = useState('')
+  const [deletedTodo, setDeletedTodo] = useState<DeletedTodo | null>(null)
   const todos = syncState.todos
 
   useEffect(
@@ -51,8 +58,12 @@ function App() {
   )
   const visibleTodos = useMemo(() => filterTodos(todos, filter), [todos, filter])
 
-  function commit(nextTodos: Todo[], operationName: string) {
-    void syncController.commit(nextTodos, operationName)
+  function commit(
+    nextTodos: Todo[],
+    operationName: string,
+    options?: CommitTodoOptions,
+  ) {
+    void syncController.commit(nextTodos, operationName, options)
   }
 
   function selectFilter(nextFilter: TodoFilter) {
@@ -72,6 +83,35 @@ function App() {
 
   function handleOnlineChange(nextOnline: boolean) {
     void syncController.setOnline(nextOnline)
+  }
+
+  function handleDelete(todo: Todo) {
+    setDeletedTodo({
+      todo,
+      index: todos.findIndex((item) => item.id === todo.id),
+    })
+    commit(deleteTodo(todos, todo.id), `delete ${todo.title}`, {
+      type: 'delete',
+      todoId: todo.id,
+    })
+  }
+
+  function handleUndoDelete() {
+    if (!deletedTodo) {
+      return
+    }
+
+    const restoredTodos = restoreTodoAt(
+      todos,
+      deletedTodo.todo,
+      deletedTodo.index,
+    )
+    void syncController.undoDelete(
+      restoredTodos,
+      deletedTodo.todo.id,
+      `undo delete ${deletedTodo.todo.title}`,
+    )
+    setDeletedTodo(null)
   }
 
   return (
@@ -102,6 +142,15 @@ function App() {
         <p className="sync-error" role="alert">
           {syncState.error}
         </p>
+      ) : null}
+
+      {deletedTodo ? (
+        <div className="undo-delete" role="status">
+          <span>Deleted "{deletedTodo.todo.title}"</span>
+          <button type="button" onClick={handleUndoDelete}>
+            Undo
+          </button>
+        </div>
       ) : null}
 
       <form className="todo-form" onSubmit={handleSubmit}>
@@ -150,9 +199,7 @@ function App() {
               </label>
               <button
                 type="button"
-                onClick={() =>
-                  commit(deleteTodo(todos, todo.id), `delete ${todo.title}`)
-                }
+                onClick={() => handleDelete(todo)}
               >
                 Delete
               </button>
@@ -162,6 +209,17 @@ function App() {
       )}
     </main>
   )
+}
+
+function restoreTodoAt(todos: Todo[], todo: Todo, index: number) {
+  if (todos.some((item) => item.id === todo.id)) {
+    return todos
+  }
+
+  const restored = [...todos]
+  const safeIndex = Math.min(Math.max(index, 0), restored.length)
+  restored.splice(safeIndex, 0, todo)
+  return restored
 }
 
 export default App

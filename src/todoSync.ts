@@ -1,10 +1,19 @@
 import type { Todo } from './todos'
 
+type PersistTodoOperationType = 'save' | 'delete'
+
+export type CommitTodoOptions = {
+  type?: PersistTodoOperationType
+  todoId?: string
+}
+
 export type PersistTodoOperation = {
   id: string
   name: string
   todos: Todo[]
   version: number
+  type: PersistTodoOperationType
+  todoId?: string
 }
 
 type PersistTodoResponse = {
@@ -86,12 +95,18 @@ class TodoSyncController {
     }
   }
 
-  commit(todos: Todo[], name: string): Promise<void> {
+  commit(
+    todos: Todo[],
+    name: string,
+    options: CommitTodoOptions = {},
+  ): Promise<void> {
     const operation: PersistTodoOperation = {
       id: `${this.snapshot.version + 1}`,
       name,
       todos: cloneTodos(todos),
       version: this.snapshot.version + 1,
+      type: options.type ?? 'save',
+      todoId: options.todoId,
     }
 
     this.snapshot = {
@@ -109,6 +124,26 @@ class TodoSyncController {
 
     this.emit()
     return this.persistOperation(operation).then(() => undefined)
+  }
+
+  undoDelete(todos: Todo[], todoId: string, name: string): Promise<void> {
+    const restoredTodos = cloneTodos(todos)
+    const removedQueuedDelete = this.removeQueuedDeletes(todoId, restoredTodos)
+
+    if (removedQueuedDelete && !this.snapshot.online) {
+      this.snapshot = {
+        ...this.snapshot,
+        todos: restoredTodos,
+        error: null,
+        version: this.snapshot.version + 1,
+        pendingCount: this.queue.length,
+      }
+      this.saveLocalTodos(restoredTodos)
+      this.emit()
+      return Promise.resolve()
+    }
+
+    return this.commit(restoredTodos, name)
   }
 
   setOnline(online: boolean): Promise<void> {
@@ -153,8 +188,7 @@ class TodoSyncController {
       if (!synced) {
         return
       }
-      this.queue.shift()
-      this.updateQueueSnapshot()
+      this.removeQueuedOperation(operation.id)
     }
   }
 
@@ -192,6 +226,41 @@ class TodoSyncController {
       pendingCount: this.queue.length,
     }
     this.emit()
+  }
+
+  private removeQueuedDeletes(todoId: string, restoredTodos: Todo[]) {
+    const previousLength = this.queue.length
+    let firstRemovedIndex = this.queue.length
+    for (let index = this.queue.length - 1; index >= 0; index -= 1) {
+      const operation = this.queue[index]
+      if (operation?.type === 'delete' && operation.todoId === todoId) {
+        this.queue.splice(index, 1)
+        firstRemovedIndex = Math.min(firstRemovedIndex, index)
+      }
+    }
+    for (let index = firstRemovedIndex; index < this.queue.length; index += 1) {
+      const operation = this.queue[index]
+      if (operation) {
+        this.queue[index] = {
+          ...operation,
+          todos: cloneTodos(restoredTodos),
+        }
+      }
+    }
+    this.snapshot = {
+      ...this.snapshot,
+      pendingCount: this.queue.length,
+    }
+    return this.queue.length !== previousLength
+  }
+
+  private removeQueuedOperation(operationId: string) {
+    const index = this.queue.findIndex((operation) => operation.id === operationId)
+    if (index === -1) {
+      return
+    }
+    this.queue.splice(index, 1)
+    this.updateQueueSnapshot()
   }
 
   private emit() {
