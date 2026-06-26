@@ -30,8 +30,10 @@ test('filters todos and restores the selected filter after reload', async ({
 
   await expect(page.getByText('1 active of 2 total')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Active' }).click()
-  await expect(page.getByRole('button', { name: 'Active' })).toHaveAttribute(
+  const filters = page.getByLabel('Todo filters')
+
+  await filters.getByRole('button', { name: 'Active', exact: true }).click()
+  await expect(filters.getByRole('button', { name: 'Active', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   )
@@ -39,9 +41,9 @@ test('filters todos and restores the selected filter after reload', async ({
   await expect(page.getByText('Ship completed')).toBeHidden()
   await expect(page.getByText('1 active of 2 total')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Completed' }).click()
+  await filters.getByRole('button', { name: 'Completed', exact: true }).click()
   await expect(
-    page.getByRole('button', { name: 'Completed' }),
+    filters.getByRole('button', { name: 'Completed', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByText('Keep active')).toBeHidden()
   await expect(page.getByText('Ship completed')).toBeVisible()
@@ -50,12 +52,17 @@ test('filters todos and restores the selected filter after reload', async ({
   await page.reload()
 
   await expect(
-    page.getByRole('button', { name: 'Completed' }),
+    page
+      .getByLabel('Todo filters')
+      .getByRole('button', { name: 'Completed', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByText('Keep active')).toBeHidden()
   await expect(page.getByText('Ship completed')).toBeVisible()
 
-  await page.getByRole('button', { name: 'All' }).click()
+  await page
+    .getByLabel('Todo filters')
+    .getByRole('button', { name: 'All', exact: true })
+    .click()
   await expect(page.getByText('Keep active')).toBeVisible()
   await expect(page.getByText('Ship completed')).toBeVisible()
 })
@@ -74,6 +81,32 @@ test('queues an offline add and drains it after returning online', async ({
 
   await expect(page.getByText('Draft offline sync')).toBeVisible()
   await expect(page.getByText('Pending sync: 1')).toBeVisible()
+
+  await page.getByLabel('Online mode').check()
+  await expect(page.getByText('Online')).toBeVisible()
+  await expect(page.getByText('Pending sync: 0')).toBeVisible()
+})
+
+test('queues one offline bulk complete and drains it after returning online', async ({
+  page,
+}) => {
+  await page.goto('/')
+
+  await page.getByLabel('New todo').fill('Draft the issue')
+  await page.getByRole('button', { name: 'Add' }).click()
+  await page.getByLabel('New todo').fill('Ship the PR')
+  await page.getByRole('button', { name: 'Add' }).click()
+  await expect(page.getByText('2 active of 2 total')).toBeVisible()
+
+  await page.getByLabel('Online mode').uncheck()
+  await expect(page.getByText('Offline')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Complete all active' }).click()
+
+  await expect(page.getByText('0 active of 2 total')).toBeVisible()
+  await expect(page.getByText('Pending sync: 1')).toBeVisible()
+  await expect(page.getByRole('checkbox', { name: 'Draft the issue' })).toBeChecked()
+  await expect(page.getByRole('checkbox', { name: 'Ship the PR' })).toBeChecked()
 
   await page.getByLabel('Online mode').check()
   await expect(page.getByText('Online')).toBeVisible()

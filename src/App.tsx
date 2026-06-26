@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   addTodo,
+  completeActiveTodos,
   deleteTodo,
   filterTodos,
   loadTodoFilter,
@@ -83,6 +84,14 @@ function App() {
 
   function handleOnlineChange(nextOnline: boolean) {
     void syncController.setOnline(nextOnline)
+  }
+
+  function handleCompleteActive() {
+    const next = completeActiveTodos(todos)
+    if (next === todos) {
+      return
+    }
+    commit(next, 'complete all active', { type: 'bulk-complete' })
   }
 
   function handleDelete(todo: Todo) {
@@ -177,6 +186,16 @@ function App() {
             {option.label}
           </button>
         ))}
+      </div>
+
+      <div className="bulk-actions">
+        <button
+          type="button"
+          onClick={handleCompleteActive}
+          disabled={remaining === 0}
+        >
+          Complete all active
+        </button>
       </div>
 
       {todos.length === 0 ? (
